@@ -1,0 +1,9 @@
+-r production.txt
+
+pytest
+pytest-cache
+pytest-cov
+pytest-timeout
+pytest-xdist
+coverage
+flake8

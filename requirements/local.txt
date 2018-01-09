@@ -1,0 +1,5 @@
+-r test.txt
+ipdb
+pre-commit
+pylint
+ipython
