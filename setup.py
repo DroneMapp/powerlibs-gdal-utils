@@ -6,7 +6,7 @@ try:
 except ImportError:
     from distutils.core import setup
 
-version = '0.0.1'
+version = '0.0.2'
 
 
 def pip_git_to_setuptools_git(url):
@@ -42,7 +42,7 @@ setup(
     author_email='cleberman@gmail.com',
     url='https://github.com/Dronemapp/powerlibs-gdal-utils',
     license=license,
-    packages=['powerlibs', 'powerlibs.gdal', 'powerlibs.gdal.util'],
+    packages=['powerlibs', 'powerlibs.gdal', 'powerlibs.gdal.utils'],
     package_data={'': ['LICENSE', 'README.md']},
     include_package_data=True,
     install_requires=requires,
