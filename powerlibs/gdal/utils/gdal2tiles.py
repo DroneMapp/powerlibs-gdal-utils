@@ -561,7 +561,7 @@ gdal_vrtmerge.py -o merged.vrt %s""" % " ".join(self.args))
 
         from optparse import OptionParser, OptionGroup
         usage = "Usage: %prog [options] input_file(s) [output]"
-        p = OptionParser(usage, version="%prog "+ __version__)
+        p = OptionParser(usage, version="%prog 0")
         p.add_option("-p", "--profile", dest='profile', type='choice', choices=profile_list,
                           help="Tile cutting profile (%s) - default 'mercator' (Google Maps compatible)" % ",".join(profile_list))
         p.add_option("-r", "--resampling", dest="resampling", type='choice', choices=resampling_list,
