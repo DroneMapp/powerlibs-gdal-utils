@@ -19,9 +19,15 @@ class RasterFile:
         # EPSG:4326 bounds:
         source_reference_system = osr.SpatialReference()
         source_reference_system.ImportFromWkt(wkt)
+
+        self.epsg = None
+        authority = source_reference_system.GetAttrValue("AUTHORITY", 0)
+        code = source_reference_system.GetAttrValue("AUTHORITY", 1)
+        if authority == 'EPSG':
+            self.epsg = int(code)
+
         target_reference_system = osr.SpatialReference()
         target_reference_system.ImportFromEPSG(4326)
-
         transformation = osr.CoordinateTransformation(source_reference_system, target_reference_system)
         coordinates = ((ulx, uly), (lrx, lry))
         bounds = [transformation.TransformPoint(x, y)[:2] for x, y in coordinates]
