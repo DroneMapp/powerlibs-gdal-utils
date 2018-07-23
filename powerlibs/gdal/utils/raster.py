@@ -13,8 +13,11 @@ class RasterFile:
         lry = uly + (raster.RasterYSize * yres)
         native_bounds = (ulx, uly, lrx, lry)
 
-        gsd_in_meters = abs(xres)
-        gsd = gsd_in_meters * 100.0
+        gsd_in_meters_x = abs(xres)
+        gsd_in_meters_y = abs(yres)
+        self.gsd_x = gsd_in_meters_x * 100.0  # In centimeters!
+        self.gsd_y = gsd_in_meters_y * 100.0
+        self.gsd = gsd_in_meters_x * 100
 
         # EPSG:4326 bounds:
         source_reference_system = osr.SpatialReference()
@@ -38,8 +41,6 @@ class RasterFile:
         self.width = width
         self.height = height
         self.dimensions = (width, height)
-
-        self.gsd = gsd
 
         self.wkt = wkt
         self.native_bounds = native_bounds
