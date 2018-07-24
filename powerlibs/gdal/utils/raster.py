@@ -15,9 +15,9 @@ class RasterFile:
 
         gsd_in_meters_x = abs(xres)
         gsd_in_meters_y = abs(yres)
-        self.gsd_x = gsd_in_meters_x * 100.0  # In centimeters!
-        self.gsd_y = gsd_in_meters_y * 100.0
-        self.gsd = gsd_in_meters_x * 100
+        self.gsd_x = gsd_in_meters_x
+        self.gsd_y = gsd_in_meters_y
+        self.gsd = gsd_in_meters_x * 100  # centimeters
 
         # EPSG:4326 bounds:
         source_reference_system = osr.SpatialReference()
