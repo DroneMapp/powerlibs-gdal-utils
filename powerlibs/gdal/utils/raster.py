@@ -5,6 +5,7 @@ from shapely.geometry import Point
 class RasterFile:
     def __init__(self, orthomosaic_path):
         raster = gdal.Open(str(orthomosaic_path))
+        self.raster = raster
         wkt = raster.GetProjection()
         width, height = raster.RasterXSize, raster.RasterYSize
 
@@ -18,6 +19,14 @@ class RasterFile:
         self.gsd_x = gsd_in_meters_x
         self.gsd_y = gsd_in_meters_y
         self.gsd = gsd_in_meters_x * 100  # centimeters
+
+        self.raster_band = self.raster.GetRasterBand(1)
+        self.no_data_value = self.raster_band.GetNoDataValue()
+        stats = self.raster_band.GetStatistics(True, True)
+        self.lower_altitude = stats[0]
+        self.higher_altitude = stats[1]
+        self.mean_altitude = stats[2]
+        self.altitude_std_deviation = stats[3]
 
         # EPSG:4326 bounds:
         source_reference_system = osr.SpatialReference()
