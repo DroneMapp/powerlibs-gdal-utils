@@ -1121,6 +1121,8 @@ gdal2tiles temp.vrt""" % self.input )
                             print("\tReadRaster Extent: ", (rx, ry, rxsize, rysize), (wx, wy, wxsize, wysize))
 
                         self.image_output.write_base_tile(tx, ty, tz, xyzzy)
+                    except TypeError as ex:
+                        print(f'TypeError: {ex} | tz:{tz} tx:{tx} ty:{ty}')
                     except ImageOutputException as e:
                         raise Exception("'%d/%d/%d': %s" % (tz, tx, ty, e.message))
 
