@@ -59,8 +59,8 @@ class BaseImageOutput:
 
         path = self.get_full_path(tx, ty, tz, 'png')
 
-        # Query is in 'nearest neighbour' but can be bigger in then the tilesize
-        # We scale down the query to the tilesize by supplied algorithm.
+        # Query is in 'nearest neighbour' but can be bigger in then the tile_size
+        # We scale down the query to the tile_size by supplied algorithm.
         if self.tile_size == xyzzy.querysize:
             # Use the ReadRaster result directly in tiles ('nearest neighbour' query)
             dstile.WriteRaster(
@@ -81,7 +81,7 @@ class BaseImageOutput:
             # the ReadRaster function returns high-quality raster (not ugly nearest neighbour)
             # TODO: Use directly 'near' for WaveLet files
         else:
-            # Big ReadRaster query in memory scaled to the tilesize - all but 'near' algo
+            # Big ReadRaster query in memory scaled to the tile_size - all but 'near' algo
             dsquery = self.mem_drv.Create(
                 '', xyzzy.querysize, xyzzy.querysize, num_bands
             )
@@ -118,10 +118,7 @@ class BaseImageOutput:
         dsquery.GetRasterBand(num_bands).Fill(0)
 
         for cx, cy, child_image_format in self.iter_children(tx, ty, tz):
-            if (ty == 0 and cy == 1) or (ty != 0 and (cy % (2 * ty)) != 0):
-                tileposy = 0
-            else:
-                tileposy = self.tile_size
+            tileposy = self.get_tileposy(ty, cy)
             if tx:
                 tileposx = cx % (2 * tx) * self.tile_size
             elif tx == 0 and cx == 1:
@@ -150,6 +147,12 @@ class BaseImageOutput:
         )
         path = self.get_full_path(tx, ty, tz, 'png')
         self.resampler(path, dsquery, dstile, 'PNG')
+
+    def get_tileposy(self, ty, cy):
+        if (ty == 0 and cy == 1) or (ty != 0 and (cy % (2 * ty)) != 0):
+            return 0
+        else:
+            return self.tile_size
 
     def iter_children(self, tx, ty, tz):
         """Generate all children of the given

@@ -200,7 +200,7 @@ class Mercator(CommonProfile):
         max_dimension = max(self.out_ds.RasterXSize, self.out_ds.RasterYSize)
         if self.min_zoom is None:
             self.min_zoom = self.mercator.ZoomForPixelSize(
-                self.out_gt[1] * max_dimension / float(self.tilesize)
+                self.out_gt[1] * max_dimension / float(self.tile_size)
             )
 
         # Get the maximal zoom level
@@ -244,7 +244,7 @@ class Geodetic(CommonProfile):
                 self.out_ds.RasterXSize, self.out_ds.RasterYSize
             )
             self.min_zoom = self.geodetic.ZoomForPixelSize(
-                self.out_gt[1] * max_dimension / float(self.tilesize)
+                self.out_gt[1] * max_dimension / float(self.tile_size)
             )
 
         # Get the maximal zoom level

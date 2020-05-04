@@ -3,12 +3,9 @@ from pathlib import PosixPath
 import numpy
 from osgeo import gdal
 from osgeo import osr
-import osgeo.gdal_array as gdalarray
-from PIL import Image
 
-from .exceptions import ImageOutputException
 from .image_output import SimpleImageOutput
-from .utils import gdal_write, ensure_dir_exists
+from .resampler import Resampler
 
 
 class GDAL2Tiles:
@@ -29,7 +26,7 @@ class GDAL2Tiles:
         self.source_nodata = source_nodata
 
         # Tile format
-        self.tilesize = 256
+        self.tile_size = 256
 
         # Should we read bigger window of the input raster and scale it down?
         # Note: Modified later by open_input()
@@ -53,11 +50,11 @@ class GDAL2Tiles:
         # Later on reset according the chosen resampling algorightm
 
         if self.resampling_method == 'near':
-            self.querysize = self.tilesize
+            self.querysize = self.tile_size
         elif self.resampling_method == 'bilinear':
-            self.querysize = self.tilesize * 2
+            self.querysize = self.tile_size * 2
         else:
-            self.querysize = 4 * self.tilesize
+            self.querysize = 4 * self.tile_size
 
     def check_resampling_method_availability(self):
         # Supported options
@@ -102,6 +99,7 @@ class GDAL2Tiles:
             self.out_ds = self.in_ds
 
         self.instantiate_image_output()
+        self.configure_bounds()
         self.calculate_ranges_for_tiles()
 
     def reproject_if_necessary(self):
@@ -177,9 +175,14 @@ gdal2tiles temp.vrt""" % self.source_path)
     def instantiate_image_output(self):
         # Instantiate image output.
         self.image_output = ImageOutput(
-            self.out_ds, self.tilesize,
-            self.resampling_method, self.source_nodata, self.output_dir)
+            self.out_ds,
+            self.tile_size,
+            self.resampling_method,
+            self.source_nodata,
+            self.output_dir
+        )
 
+    def configure_bounds(self):
         # Read the georeference
         self.out_gt = self.out_ds.GetGeoTransform()
 
@@ -221,7 +224,7 @@ gdal2tiles temp.vrt""" % self.source_path)
         # tmaxy = tminy
 
         tz = self.max_zoom
-        for ty in range(tmaxy, tminy - 1, -1):
+        for ty in self.get_y_range():
             for tx in range(tminx, tmaxx + 1):
                 xyzzy = self.generate_base_tile_xyzzy(
                     tx, ty, tz,
@@ -243,12 +246,16 @@ gdal2tiles temp.vrt""" % self.source_path)
             tminx, tminy, tmaxx, tmaxy = self.tminmax[tz]
             tcount += (1 + abs(tmaxx - tminx)) * (1 + abs(tmaxy - tminy))
 
-        # querysize = tilesize * 2
+        # querysize = tile_size * 2
         for tz in range(self.max_zoom - 1, self.min_zoom - 1, -1):
             tminx, tminy, tmaxx, tmaxy = self.tminmax[tz]
-            for ty in range(tmaxy, tminy - 1, -1):
+            for ty in self.get_y_range():
                 for tx in range(tminx, tmaxx + 1):
                     self.image_output.write_overview_tile(tx, ty, tz)
+
+    def get_y_range(self):
+        tminx, tminy, tmaxx, tmaxy = self.tminmax[self.max_zoom]
+        return range(tmaxy, tminy - 1, -1)
 
 
 def ImageOutput(out_ds, tile_size, resampling, nodata, output_dir):
@@ -259,68 +266,3 @@ def ImageOutput(out_ds, tile_size, resampling, nodata, output_dir):
     return SimpleImageOutput(
         out_ds, tile_size, resampler, nodata, output_dir
     )
-
-
-def Resampler(name):
-    """Return a function performing given resampling algorithm."""
-
-    def resample_average(path, dsquery, dstile, image_format):
-        for i in range(1, dstile.RasterCount + 1):
-            res = gdal.RegenerateOverview(
-                dsquery.GetRasterBand(i), dstile.GetRasterBand(i), "average"
-            )
-            if res != 0:
-                raise ImageOutputException(
-                    "RegenerateOverview() failed with error %d" % res
-                )
-
-        gdal_write(path, dstile, image_format)
-
-    def resample_antialias(path, dsquery, dstile, image_format):
-        querysize = dsquery.RasterXSize
-        tilesize = dstile.RasterXSize
-
-        array = numpy.zeros((querysize, querysize, 4), numpy.uint8)
-        for i in range(dstile.RasterCount):
-            array[:,:,i] = gdalarray.BandReadAsArray(  # NOQA
-                dsquery.GetRasterBand(i + 1), 0, 0, querysize, querysize
-            )
-        im = Image.fromarray(array, 'RGBA')  # Always four bands
-        im1 = im.resize((tilesize, tilesize), Image.ANTIALIAS)
-
-        if path.exists():
-            im0 = Image.open(str(path))
-            im1 = Image.composite(im1, im0, im1)
-
-        ensure_dir_exists(path)
-        im1.save(str(path), image_format)
-
-    if name == "average":
-        return resample_average
-    elif name == "antialias":
-        return resample_antialias
-
-    resampling_methods = {
-        "near": gdal.GRA_NearestNeighbour,
-        "bilinear": gdal.GRA_Bilinear,
-        "cubic": gdal.GRA_Cubic,
-        "cubicspline": gdal.GRA_CubicSpline,
-        "lanczos": gdal.GRA_Lanczos
-    }
-
-    resampling_method = resampling_methods[name]
-
-    def resample_gdal(path, dsquery, dstile, image_format):
-        querysize = dsquery.RasterXSize
-        tilesize = dstile.RasterXSize
-
-        dsquery.SetGeoTransform((0.0, tilesize / float(querysize), 0.0, 0.0, 0.0, tilesize / float(querysize)))
-        dstile.SetGeoTransform((0.0, 1.0, 0.0, 0.0, 0.0, 1.0))
-
-        res = gdal.ReprojectImage(dsquery, dstile, None, None, resampling_method)
-        if res != 0:
-            raise ImageOutputException("ReprojectImage() failed with error %d" % res)
-
-        gdal_write(path, dstile, image_format)
-
-    return resample_gdal
