@@ -174,7 +174,7 @@ class CommonProfile(GDAL2Tiles):
 
 class Mercator(CommonProfile):
     def set_out_srs(self):
-        self.out_srs.ImportFromEPSG(900913)
+        self.out_srs.ImportFromEPSG(3857)
 
     def calculate_ranges_for_tiles(self):
         # TODO: move it all to its own method:

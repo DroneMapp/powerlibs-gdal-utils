@@ -12,7 +12,7 @@ class GlobalMercator:
     # Oh, man, those shitty names with CamelCase...
     # TODO: fix it all
     def LatLonToMeters(self, lat, lon):
-        "Converts given lat/lon in WGS84 Datum to XY in Spherical Mercator EPSG:900913"
+        "Converts given lat/lon in WGS84 Datum to XY in Spherical Mercator EPSG:3857"
 
         mx = lon * self.originShift / 180.0
         my = math.log(math.tan((90 + lat) * math.pi / 360.0)) / (math.pi / 180.0)
@@ -21,7 +21,7 @@ class GlobalMercator:
         return mx, my
 
     def MetersToLatLon(self, mx, my):
-        "Converts XY point from Spherical Mercator EPSG:900913 to lat/lon in WGS84 Datum"
+        "Converts XY point from Spherical Mercator EPSG:3857 to lat/lon in WGS84 Datum"
 
         lon = (mx / self.originShift) * 180.0
         lat = (my / self.originShift) * 180.0
@@ -30,7 +30,7 @@ class GlobalMercator:
         return lat, lon
 
     def PixelsToMeters(self, px, py, zoom):
-        "Converts pixel coordinates in given zoom level of pyramid to EPSG:900913"
+        "Converts pixel coordinates in given zoom level of pyramid to EPSG:3857"
 
         res = self.Resolution(zoom)
         mx = px * res - self.originShift
@@ -38,7 +38,7 @@ class GlobalMercator:
         return mx, my
 
     def MetersToPixels(self, mx, my, zoom):
-        "Converts EPSG:900913 to pyramid pixel coordinates in given zoom level"
+        "Converts EPSG:3857 to pyramid pixel coordinates in given zoom level"
 
         res = self.Resolution(zoom)
         px = (mx + self.originShift) / res
@@ -64,7 +64,7 @@ class GlobalMercator:
         return self.PixelsToTile(px, py)
 
     def TileBounds(self, tx, ty, zoom):
-        "Returns bounds of the given tile in EPSG:900913 coordinates"
+        "Returns bounds of the given tile in EPSG:3857 coordinates"
 
         minx, miny = self.PixelsToMeters(
             tx * self.tileSize, ty * self.tileSize, zoom
