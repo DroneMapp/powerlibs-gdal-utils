@@ -149,6 +149,24 @@ class CommonProfile(GDAL2Tiles):
 
         return (rx, ry, rxsize, rysize), (wx, wy, wxsize, wysize)
 
+    def get_tile_bounds(self, tx, ty, tz):
+        return self.projection.TileBounds(tx, ty, tz)
+
+    def adjust_zoom(self):
+        # Get the minimal zoom level (map covers area equivalent to one tile)
+        if self.min_zoom is None:
+            max_dimension = max(
+                self.out_ds.RasterXSize, self.out_ds.RasterYSize
+            )
+            self.min_zoom = self.projection.ZoomForPixelSize(
+                self.out_gt[1] * max_dimension / float(self.tile_size)
+            )
+
+        # Get the maximal zoom level
+        # (closest possible zoom level up on the resolution of raster)
+        if self.max_zoom is None:
+            self.max_zoom = self.projection.ZoomForPixelSize(self.out_gt[1])
+
     def generate_base_tile_xyzzy(
         self,
         tx, ty, tz,
@@ -157,8 +175,6 @@ class CommonProfile(GDAL2Tiles):
     ):
         ds = self.out_ds
         b = self.get_tile_bounds(tx, ty, tz)
-        rb, wb = self.geo_query(ds, b[0], b[3], b[2], b[1])
-
         querysize = self.querysize
 
         # Tile bounds in raster coordinates for ReadRaster query
@@ -173,20 +189,19 @@ class CommonProfile(GDAL2Tiles):
 
 
 class Mercator(CommonProfile):
+    projection = GlobalMercator()
+
     def set_out_srs(self):
         self.out_srs.ImportFromEPSG(3857)
 
     def calculate_ranges_for_tiles(self):
-        # TODO: move it all to its own method:
-        self.mercator = GlobalMercator()  # from globalmaptiles.py
-
         # Generate table with min max tile coordinates for all zoomlevels
         self.tminmax = list(range(0, 32))
         for tz in range(0, 32):
-            tminx, tminy = self.mercator.MetersToTile(
+            tminx, tminy = self.projection.MetersToTile(
                 self.ominx, self.ominy, tz
             )
-            tmaxx, tmaxy = self.mercator.MetersToTile(
+            tmaxx, tmaxy = self.projection.MetersToTile(
                 self.omaxx, self.omaxy, tz
             )
             # crop tiles extending world limits (+-180,+-90)
@@ -196,30 +211,14 @@ class Mercator(CommonProfile):
 
         # TODO: Maps crossing 180E (Alaska?)
 
-        # Get the minimal zoom level (map covers area equivalent to one tile)
-        max_dimension = max(self.out_ds.RasterXSize, self.out_ds.RasterYSize)
-        if self.min_zoom is None:
-            self.min_zoom = self.mercator.ZoomForPixelSize(
-                self.out_gt[1] * max_dimension / float(self.tile_size)
-            )
-
-        # Get the maximal zoom level
-        # (closest possible zoom level up on the resolution of raster)
-        if self.max_zoom is None:
-            self.max_zoom = self.mercator.ZoomForPixelSize(self.out_gt[1])
-
-    def get_tile_bounds(self, tx, ty, tz):
-        return self.mercator.TileBounds(tx, ty, tz)
-
 
 class Geodetic(CommonProfile):
+    projection = GlobalGeodetic()
+
     def set_out_srs(self):
         self.out_srs.ImportFromEPSG(4326)
 
     def calculate_ranges_for_tiles(self):
-        # TODO: move it all to its own method:
-        self.geodetic = GlobalGeodetic()
-
         # Generate table with min max tile coordinates for all zoomlevels
         self.tminmax = list(range(0, 32))
         ominx = self.ominx
@@ -227,8 +226,8 @@ class Geodetic(CommonProfile):
         omaxx = self.omaxx
         omaxy = self.omaxy
         for tz in range(0, 32):
-            tminx, tminy = self.geodetic.LatLonToTile(ominx, ominy, tz)
-            tmaxx, tmaxy = self.geodetic.LatLonToTile(omaxx, omaxy, tz)
+            tminx, tminy = self.projection.LatLonToTile(ominx, ominy, tz)
+            tmaxx, tmaxy = self.projection.LatLonToTile(omaxx, omaxy, tz)
 
             # crop tiles extending world limits (+-180,+-90)
             tminx, tminy = max(0, tminx), max(0, tminy)
@@ -236,21 +235,3 @@ class Geodetic(CommonProfile):
             self.tminmax[tz] = (tminx, tminy, tmaxx, tmaxy)
 
         # TODO: Maps crossing 180E (Alaska?)
-
-        # Get the maximal zoom level
-        # (closest possible zoom level up on the resolution of raster)
-        if self.min_zoom is None:
-            max_dimension = max(
-                self.out_ds.RasterXSize, self.out_ds.RasterYSize
-            )
-            self.min_zoom = self.geodetic.ZoomForPixelSize(
-                self.out_gt[1] * max_dimension / float(self.tile_size)
-            )
-
-        # Get the maximal zoom level
-        # (closest possible zoom level up on the resolution of raster)
-        if self.max_zoom is None:
-            self.max_zoom = self.geodetic.ZoomForPixelSize(self.out_gt[1])
-
-    def get_tile_bounds(self, tx, ty, tz):
-        return self.geodetic.TileBounds(tx, ty, tz)

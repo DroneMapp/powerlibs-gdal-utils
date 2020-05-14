@@ -1,3 +1,4 @@
+import numpy
 from osgeo import gdal
 import osgeo.gdal_array as gdalarray
 from PIL import Image

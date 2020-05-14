@@ -1,7 +1,11 @@
 class Xyzzy:
-    """Collection of coordinates describing what to read where for the given tile at the base level."""
+    """Collection of coordinates describing what to read and where
+       for the given tile at the base level."""
 
-    def __init__(self, querysize, rx, ry, rxsize, rysize, wx, wy, wxsize, wysize):
+    def __init__(
+        self, querysize, rx, ry, rxsize, rysize, wx, wy, wxsize, wysize
+    ):
+        # TODO: use a proper data structure, here...
         self.querysize = querysize
         self.rx = rx
         self.ry = ry

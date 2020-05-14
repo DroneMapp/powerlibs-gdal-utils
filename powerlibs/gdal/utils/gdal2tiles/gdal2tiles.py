@@ -100,6 +100,7 @@ class GDAL2Tiles:
 
         self.instantiate_image_output()
         self.configure_bounds()
+        self.adjust_zoom()
         self.calculate_ranges_for_tiles()
 
     def reproject_if_necessary(self):

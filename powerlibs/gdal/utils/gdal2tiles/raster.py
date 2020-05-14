@@ -10,7 +10,7 @@ class Raster(GDAL2Tiles):
     def set_out_srs(self):
         self.out_srs = self.in_srs
 
-    def calculate_ranges_for_tiles(self):
+    def adjust_zoom(self):
         def log2(x):
             return math.log10(x) / math.log10(2)
 
@@ -27,6 +27,7 @@ class Raster(GDAL2Tiles):
         if self.max_zoom is None:
             self.max_zoom = self.nativezoom
 
+    def calculate_ranges_for_tiles(self):
         # Generate table with min max tile coordinates for all zoomlevels
         self.tminmax = list(range(0, self.max_zoom + 1))
         self.tsize = list(range(0, self.max_zoom + 1))

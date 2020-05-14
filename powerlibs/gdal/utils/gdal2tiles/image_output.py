@@ -43,7 +43,6 @@ class BaseImageOutput:
             self.data_bands_count = self.out_ds.RasterCount
 
     def create_base_tile(self, tx, ty, tz, xyzzy, alpha):
-
         """Create image of a base level tile and write it to disk."""
 
         if alpha is None:
@@ -57,9 +56,21 @@ class BaseImageOutput:
         data = self.out_ds.ReadRaster(xyzzy.rx, xyzzy.ry, xyzzy.rxsize, xyzzy.rysize,
                                       xyzzy.wxsize, xyzzy.wysize, band_list=data_bands)
 
+        """
+        ReadRaster(
+            xoff=0, yoff=0,
+            xsize=None, ysize=None,
+            buf_xsize=None, buf_ysize=None,
+            buf_type=None, band_list=None,
+            buf_pixel_space=None, buf_line_space=None,
+            buf_band_space=None,
+            resample_alg=gdalconst.GRIORA_NearestNeighbour
+        )
+        """
+
         path = self.get_full_path(tx, ty, tz, 'png')
 
-        # Query is in 'nearest neighbour' but can be bigger in then the tile_size
+        # Query is in 'nearest neighbour' but can be bigger than the tile_size.
         # We scale down the query to the tile_size by supplied algorithm.
         if self.tile_size == xyzzy.querysize:
             # Use the ReadRaster result directly in tiles ('nearest neighbour' query)
@@ -104,7 +115,7 @@ class BaseImageOutput:
                     alpha, band_list=[num_bands]
                 )
 
-            self.resampler(str(path), dsquery, dstile, 'PNG')
+            self.resampler(path, dsquery, dstile, 'PNG')
 
     def create_overview_tile(self, tx, ty, tz):
         """Create image of a overview level tile and write it to disk."""
