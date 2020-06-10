@@ -89,7 +89,7 @@ class LeafletImageOutput(SimpleImageOutput):
 
 
 class Leaflet(Raster):
-    def get_y_range(self):
+    def get_y_range(self, zoom):
         tminx, tminy, tmaxx, tmaxy = self.tminmax[self.max_zoom]
         return range(tminy, tmaxy + 1)
 

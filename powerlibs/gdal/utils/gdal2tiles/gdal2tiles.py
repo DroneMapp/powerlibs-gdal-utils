@@ -225,7 +225,7 @@ gdal2tiles temp.vrt""" % self.source_path)
         # tmaxy = tminy
 
         tz = self.max_zoom
-        for ty in self.get_y_range():
+        for ty in self.get_y_range(self.max_zoom):
             for tx in range(tminx, tmaxx + 1):
                 xyzzy = self.generate_base_tile_xyzzy(
                     tx, ty, tz,
@@ -250,12 +250,12 @@ gdal2tiles temp.vrt""" % self.source_path)
         # querysize = tile_size * 2
         for tz in range(self.max_zoom - 1, self.min_zoom - 1, -1):
             tminx, tminy, tmaxx, tmaxy = self.tminmax[tz]
-            for ty in self.get_y_range():
+            for ty in self.get_y_range(tz):
                 for tx in range(tminx, tmaxx + 1):
                     self.image_output.write_overview_tile(tx, ty, tz)
 
-    def get_y_range(self):
-        tminx, tminy, tmaxx, tmaxy = self.tminmax[self.max_zoom]
+    def get_y_range(self, zoom):
+        tminx, tminy, tmaxx, tmaxy = self.tminmax[zoom]
         return range(tmaxy, tminy - 1, -1)
 
 

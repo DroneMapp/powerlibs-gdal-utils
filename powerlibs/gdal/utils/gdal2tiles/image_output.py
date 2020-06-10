@@ -45,6 +45,10 @@ class BaseImageOutput:
     def create_base_tile(self, tx, ty, tz, xyzzy, alpha):
         """Create image of a base level tile and write it to disk."""
 
+        path = self.get_full_path(tx, ty, tz, 'png')
+        if path.exists():
+            return
+
         if alpha is None:
             num_bands = self.data_bands_count
         else:
@@ -67,8 +71,6 @@ class BaseImageOutput:
             resample_alg=gdalconst.GRIORA_NearestNeighbour
         )
         """
-
-        path = self.get_full_path(tx, ty, tz, 'png')
 
         # Query is in 'nearest neighbour' but can be bigger than the tile_size.
         # We scale down the query to the tile_size by supplied algorithm.

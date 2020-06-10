@@ -1,4 +1,5 @@
 import os
+import tempfile
 
 from osgeo import gdal
 
@@ -43,7 +44,6 @@ class CommonProfile(GDAL2Tiles):
 
             # Correction of AutoCreateWarpedVRT for NODATA values
             if self.source_nodata != []:
-                import tempfile
                 tempfilename = tempfile.mktemp('-gdal2tiles.vrt')
                 self.out_ds.GetDriver().CreateCopy(tempfilename, self.out_ds)
                 # open as a text file
@@ -83,7 +83,6 @@ class CommonProfile(GDAL2Tiles):
             # Correction of AutoCreateWarpedVRT for Mono (1 band) and RGB (3 bands) files without NODATA:
             # equivalent of gdalwarp -dstalpha
             if self.source_nodata == [] and self.out_ds.RasterCount in [1, 3]:
-                import tempfile
                 tempfilename = tempfile.mktemp('-gdal2tiles.vrt')
                 self.out_ds.GetDriver().CreateCopy(tempfilename, self.out_ds)
                 # open as a text file
