@@ -6,6 +6,7 @@ from osgeo import osr
 
 from .image_output import SimpleImageOutput
 from .resampler import Resampler
+from .utils import ensure_dir_exists
 
 
 class GDAL2Tiles:
@@ -17,7 +18,7 @@ class GDAL2Tiles:
             source_srs=None, source_nodata=None
     ):
         self.source_path = PosixPath(source_path)
-        self.output_dir = output_dir
+        self.output_dir = PosixPath(output_dir)
         self.min_zoom = min_zoom
         self.max_zoom = max_zoom
 
@@ -41,7 +42,6 @@ class GDAL2Tiles:
         # existing underlying tiles
         self.overviewquery = False
 
-        self.srcnodata = None
         self.check_resampling_method_availability()
         self.set_querysize()
 
@@ -134,22 +134,14 @@ then run:
 gdal2tiles temp.vrt""" % self.source_path)
 
         # Get NODATA value
-        # User supplied values overwrite everything else.
-        if self.srcnodata:
-            nds = list(map(float, self.srcnodata.split(',')))
-            raster_count = self.in_ds.RasterCount
-            if len(nds) < raster_count:
-                self.source_nodata = (nds * raster_count)[:raster_count]
-            else:
-                self.source_nodata = nds
-        else:
-            # If the source dataset has NODATA, use it.
-            self.source_nodata = []
+        # If the source dataset has NODATA, use it.
+        if self.source_nodata is None:
             for i in range(1, self.in_ds.RasterCount + 1):
-                if self.in_ds.GetRasterBand(i).GetNoDataValue() is not None:
-                    self.source_nodata.append(self.in_ds.GetRasterBand(i).GetNoDataValue())
+                ndvalue = self.in_ds.GetRasterBand(i).GetNoDataValue()
+                if ndvalue is not None:
+                    self.source_nodata = ndvalue
+                    break
 
-        #
         # Here we should have RGBA input dataset opened in self.in_ds
 
         # Spatial Reference System of the input raster
@@ -175,12 +167,13 @@ gdal2tiles temp.vrt""" % self.source_path)
 
     def instantiate_image_output(self):
         # Instantiate image output.
-        self.image_output = ImageOutput(
+        resampler = Resampler(self.resampling_method)
+        self.image_output = SimpleImageOutput(
             self.out_ds,
             self.tile_size,
-            self.resampling_method,
+            resampler,
             self.source_nodata,
-            self.output_dir
+            self.output_dir,
         )
 
     def configure_bounds(self):
@@ -225,15 +218,20 @@ gdal2tiles temp.vrt""" % self.source_path)
         # tmaxy = tminy
 
         tz = self.max_zoom
-        for ty in self.get_y_range(self.max_zoom):
-            for tx in range(tminx, tmaxx + 1):
+        tzs = str(tz)
+        for tx in range(tminx, tmaxx + 1):
+            target_path = self.output_dir / tzs / str(tx)
+            dir_already_existed = ensure_dir_exists(target_path)
+
+            for ty in self.get_y_range(self.max_zoom):
                 xyzzy = self.generate_base_tile_xyzzy(
                     tx, ty, tz,
                     querysize,
                     tminx, tminy, tmaxx, tmaxy
                 )
-
-                self.image_output.write_base_tile(tx, ty, tz, xyzzy)
+                self.image_output.write_base_tile(
+                    tx, ty, tz, xyzzy, dir_already_existed
+                )
 
     # -------------------------------------------------------------------------
     def generate_overview_tiles(self):
@@ -250,20 +248,17 @@ gdal2tiles temp.vrt""" % self.source_path)
         # querysize = tile_size * 2
         for tz in range(self.max_zoom - 1, self.min_zoom - 1, -1):
             tminx, tminy, tmaxx, tmaxy = self.tminmax[tz]
-            for ty in self.get_y_range(tz):
-                for tx in range(tminx, tmaxx + 1):
-                    self.image_output.write_overview_tile(tx, ty, tz)
+
+            tzs = str(tz)
+            for tx in range(tminx, tmaxx + 1):
+                target_path = self.output_dir / tzs / str(tx)
+                dir_already_existed = ensure_dir_exists(target_path)
+
+                for ty in self.get_y_range(tz):
+                    self.image_output.write_overview_tile(
+                        tx, ty, tz, dir_already_existed
+                    )
 
     def get_y_range(self, zoom):
         tminx, tminy, tmaxx, tmaxy = self.tminmax[zoom]
         return range(tmaxy, tminy - 1, -1)
-
-
-def ImageOutput(out_ds, tile_size, resampling, nodata, output_dir):
-    """Return object representing tile image output
-    implementing given parameters."""
-
-    resampler = Resampler(resampling)
-    return SimpleImageOutput(
-        out_ds, tile_size, resampler, nodata, output_dir
-    )

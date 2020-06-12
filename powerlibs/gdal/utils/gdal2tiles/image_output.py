@@ -1,3 +1,4 @@
+import logging
 from pathlib import PosixPath
 import os
 
@@ -6,19 +7,21 @@ from osgeo import gdal
 from .utils import get_gdal_driver, gdal_write
 
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=os.getenv('LOG_LEVEL', 'WARNING'))
+
+
 def get_tile_filename(tx, ty, tz, extension):
     return os.path.join(str(tz), str(tx), "%s.%s" % (ty, extension))
 
 
 class BaseImageOutput:
-    """Base class for image output.
+    """Base class for image output."""
 
-    Child classes are supposed to provide two methods `write_base_tile' and
-    `write_overview_tile'. These will call `create_base_tile' and
-    `create_overview_tile' with arguments appropriate to their output strategy.
-    """
-
-    def __init__(self, out_ds, tile_size, resampler, nodata, output_dir):
+    def __init__(
+        self, out_ds, tile_size, resampler, nodata,
+        output_dir
+    ):
         self.out_ds = out_ds
         self.tile_size = tile_size
         self.resampler = resampler
@@ -29,38 +32,55 @@ class BaseImageOutput:
         self.alpha_filler = None
 
         # For raster with 4-bands: 4th unknown band set to alpha
-        if self.out_ds.RasterCount == 4 and self.out_ds.GetRasterBand(4).GetRasterColorInterpretation() == gdal.GCI_Undefined:
-            self.out_ds.GetRasterBand(4).SetRasterColorInterpretation(gdal.GCI_AlphaBand)
+        raster_count = self.out_ds.RasterCount
+        if raster_count == 4:
+            band4 = self.out_ds.GetRasterBand(4)
+            if band4.GetRasterColorInterpretation() == gdal.GCI_Undefined:
+                band4.SetRasterColorInterpretation(gdal.GCI_AlphaBand)
 
         # Get alpha band (either directly or from NODATA value)
         self.alpha_band = self.out_ds.GetRasterBand(1).GetMaskBand()
-        # XXX: Does this line really test if "has alpha"?
+
         has_alpha = self.alpha_band.GetMaskFlags() & gdal.GMF_ALPHA
-        if has_alpha or self.out_ds.RasterCount in (2, 4):
-            # TODO: Better test for alpha band in the dataset
+        logger.debug(f'has_alpha: {has_alpha}')
+        logger.debug(f'raster_count: {raster_count}')
+        if not has_alpha and raster_count in (2, 4):
+            self.alpha_band = self.out_ds.GetRasterBand(raster_count)
+            has_alpha = True
+
+        if has_alpha:
+            self.alpha_filler = "\xff" * (self.tile_size * self.tile_size)
             self.data_bands_count = self.out_ds.RasterCount - 1
         else:
+            logger.debug("NO ALPHA CHANNEL")
             self.data_bands_count = self.out_ds.RasterCount
 
-    def create_base_tile(self, tx, ty, tz, xyzzy, alpha):
+    def create_base_tile(
+        self, tx, ty, tz, xyzzy, alpha, precheck_existence=True
+    ):
         """Create image of a base level tile and write it to disk."""
 
         path = self.get_full_path(tx, ty, tz, 'png')
-        if path.exists():
+        if precheck_existence and path.exists():
+            logger.info(f'create_base_tile: {path} already exists. Skipping.')
             return
 
-        if alpha is None:
-            num_bands = self.data_bands_count
-        else:
-            num_bands = self.data_bands_count + 1
+        num_bands = self.data_bands_count
+        if alpha is not None:
+            num_bands += 1
 
         data_bands = list(range(1, self.data_bands_count + 1))
 
-        dstile = self.mem_drv.Create('', self.tile_size, self.tile_size, num_bands)
-        data = self.out_ds.ReadRaster(xyzzy.rx, xyzzy.ry, xyzzy.rxsize, xyzzy.rysize,
-                                      xyzzy.wxsize, xyzzy.wysize, band_list=data_bands)
+        dstile = self.mem_drv.Create(
+            '', self.tile_size, self.tile_size, num_bands
+        )
+        data = self.out_ds.ReadRaster(
+            xyzzy.rx, xyzzy.ry, xyzzy.rxsize, xyzzy.rysize,
+            xyzzy.wxsize, xyzzy.wysize, band_list=data_bands
+        )
 
         """
+        ReadRaster call signature:
         ReadRaster(
             xoff=0, yoff=0,
             xsize=None, ysize=None,
@@ -99,11 +119,9 @@ class BaseImageOutput:
                 '', xyzzy.querysize, xyzzy.querysize, num_bands
             )
 
-            # TODO: fill the null value in case a tile without alpha
-            # is produced (now only png tiles are supported)
             if alpha is None:
-                for i, v in enumerate(self.nodata[:num_bands]):
-                    dsquery.GetRasterBand(i + 1).Fill(v)
+                for band_index in range(self.data_bands_count):
+                    dsquery.GetRasterBand(band_index + 1).Fill(self.nodata)
 
             dsquery.WriteRaster(
                 xyzzy.wx, xyzzy.wy,
@@ -116,11 +134,15 @@ class BaseImageOutput:
                     xyzzy.wxsize, xyzzy.wysize,
                     alpha, band_list=[num_bands]
                 )
-
             self.resampler(path, dsquery, dstile, 'PNG')
 
-    def create_overview_tile(self, tx, ty, tz):
+    def write_overview_tile(self, tx, ty, tz, precheck_existence=True):
         """Create image of a overview level tile and write it to disk."""
+
+        path = self.get_full_path(tx, ty, tz, 'png')
+        if precheck_existence and path.exists():
+            logger.info(f'write_overview_tile: {path} already exists. Skipping.')
+            return
 
         num_bands = self.data_bands_count + 1
 
@@ -128,7 +150,7 @@ class BaseImageOutput:
             '', 2 * self.tile_size, 2 * self.tile_size, num_bands
         )
 
-        dsquery.GetRasterBand(num_bands).Fill(0)
+        dsquery.GetRasterBand(num_bands).Fill(self.nodata)
 
         for cx, cy, child_image_format in self.iter_children(tx, ty, tz):
             tileposy = self.get_tileposy(ty, cy)
@@ -152,13 +174,12 @@ class BaseImageOutput:
 
             dsquery.WriteRaster(
                 tileposx, tileposy, self.tile_size, self.tile_size,
-                self.get_alpha_filler(), band_list=[num_bands]
+                self.alpha_filler, band_list=[num_bands]
             )
 
         dstile = self.mem_drv.Create(
             '', self.tile_size, self.tile_size, num_bands
         )
-        path = self.get_full_path(tx, ty, tz, 'png')
         self.resampler(path, dsquery, dstile, 'PNG')
 
     def get_tileposy(self, ty, cy):
@@ -176,16 +197,14 @@ class BaseImageOutput:
                     yield x, y, 'PNG'
 
     def read_alpha(self, xyzzy):
+        if self.alpha_band is None:
+            return None
+
         return self.alpha_band.ReadRaster(
             xyzzy.rx, xyzzy.ry,
             xyzzy.rxsize, xyzzy.rysize,
             xyzzy.wxsize, xyzzy.wysize
         )
-
-    def get_alpha_filler(self):
-        if self.alpha_filler is None:
-            self.alpha_filler = "\xff" * (self.tile_size * self.tile_size)
-        return self.alpha_filler
 
     def tile_exists(self, tx, ty, tz):
         return self.get_full_path(
@@ -200,9 +219,6 @@ class BaseImageOutput:
 class SimpleImageOutput(BaseImageOutput):
     """Image output using only one image format."""
 
-    def write_base_tile(self, tx, ty, tz, xyzzy):
+    def write_base_tile(self, tx, ty, tz, xyzzy, precheck_existence=True):
         alpha = self.read_alpha(xyzzy)
-        self.create_base_tile(tx, ty, tz, xyzzy, alpha)
-
-    def write_overview_tile(self, tx, ty, tz):
-        self.create_overview_tile(tx, ty, tz)
+        self.create_base_tile(tx, ty, tz, xyzzy, alpha, precheck_existence)

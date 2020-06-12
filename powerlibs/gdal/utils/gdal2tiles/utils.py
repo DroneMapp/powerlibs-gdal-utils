@@ -15,10 +15,11 @@ def get_gdal_driver(name):
 
 
 def gdal_write(path, dstile, image_format):
-    ensure_dir_exists(path)
     PNG_DRIVER.CreateCopy(str(path), dstile, strict=0)
 
 
 def ensure_dir_exists(path):
-    parent = path.parent
-    parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        return True
+    path.mkdir(parents=True, exist_ok=True)
+    return False

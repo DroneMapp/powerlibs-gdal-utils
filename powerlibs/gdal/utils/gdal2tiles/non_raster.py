@@ -32,18 +32,23 @@ class CommonProfile(GDAL2Tiles):
                 "source reference system."
             )
 
-        if (self.in_srs.ExportToProj4() != self.out_srs.ExportToProj4()) or (self.in_ds.GetGCPCount() != 0):
-            # Generation of VRT dataset in tile projection, default 'nearest neighbour' warping
+        in_proj4 = self.in_srs.ExportToProj4()
+        out_proj4 = self.out_srs.ExportToProj4()
+        if (in_proj4 != out_proj4) or (self.in_ds.GetGCPCount() != 0):
+            # Generation of VRT dataset in tile projection,
+            # default 'nearest neighbour' warping
             self.out_ds = gdal.AutoCreateWarpedVRT(self.in_ds, self.in_srs_wkt, self.out_srs.ExportToWkt())
 
-            # TODO: HIGH PRIORITY: Correction of AutoCreateWarpedVRT according the max zoomlevel for correct direct warping!!!
+            # TODO: HIGH PRIORITY:
+            # Correction of AutoCreateWarpedVRT according the max zoomlevel
+            # for correct direct warping!!!
 
             # if verbose: self.out_ds.GetDriver().CreateCopy("tiles.vrt", self.out_ds)
 
             # Note: self.in_srs and self.in_srs_wkt contain still the non-warped reference system!!!
 
             # Correction of AutoCreateWarpedVRT for NODATA values
-            if self.source_nodata != []:
+            if self.source_nodata is not None:
                 tempfilename = tempfile.mktemp('-gdal2tiles.vrt')
                 self.out_ds.GetDriver().CreateCopy(tempfilename, self.out_ds)
                 # open as a text file
@@ -56,7 +61,7 @@ class CommonProfile(GDAL2Tiles):
 <Option name="UNIFIED_SRC_NODATA">YES</Option>"""
                 )
                 # replace BandMapping tag for NODATA bands....
-                for i in range(len(self.source_nodata)):
+                for i in range(self.in_ds.RasterCount):
                     s = s.replace("""<BandMapping src="%i" dst="%i"/>""" % ((i + 1), (i + 1)), """<BandMapping src="%i" dst="%i">
   <SrcNoDataReal>%i</SrcNoDataReal>
   <SrcNoDataImag>0</SrcNoDataImag>
@@ -64,8 +69,8 @@ class CommonProfile(GDAL2Tiles):
   <DstNoDataImag>0</DstNoDataImag>
 </BandMapping>""" % (
                         (i + 1), (i + 1),
-                        self.source_nodata[i],
-                        self.source_nodata[i])
+                        self.source_nodata,
+                        self.source_nodata)
                     )  # Or rewrite to white by: , 255 ))
                 # save the corrected VRT
                 # TODO: use TemporaryFile, here!!!
@@ -76,13 +81,16 @@ class CommonProfile(GDAL2Tiles):
                 os.unlink(tempfilename)
 
                 # set NODATA_VALUE metadata
-                self.out_ds.SetMetadataItem('NODATA_VALUES', '%s' % " ".join(str(int(f)) for f in self.source_nodata))
-#                        '%i %i %i' % (self.source_nodata[0],self.source_nodata[1],self.source_nodata[2]))
+                self.out_ds.SetMetadataItem(
+                    'NODATA_VALUES',
+                    " ".join(str(self.source_nodata) for x in
+                             range(self.in_ds.RasterCount))
+                )
 
             # -----------------------------------
             # Correction of AutoCreateWarpedVRT for Mono (1 band) and RGB (3 bands) files without NODATA:
             # equivalent of gdalwarp -dstalpha
-            if self.source_nodata == [] and self.out_ds.RasterCount in [1, 3]:
+            if self.source_nodata is None and self.out_ds.RasterCount in [1, 3]:
                 tempfilename = tempfile.mktemp('-gdal2tiles.vrt')
                 self.out_ds.GetDriver().CreateCopy(tempfilename, self.out_ds)
                 # open as a text file

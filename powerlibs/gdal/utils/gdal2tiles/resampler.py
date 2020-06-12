@@ -38,7 +38,7 @@ def Resampler(name):
             im0 = Image.open(str(path))
             im1 = Image.composite(im1, im0, im1)
 
-        ensure_dir_exists(path)
+        ensure_dir_exists(path.parent)
         im1.save(str(path), image_format)
 
     if name == "average":
