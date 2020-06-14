@@ -239,12 +239,6 @@ gdal2tiles temp.vrt""" % self.source_path)
         based on existing tiles"""
         # Usage of existing tiles:
         # from 4 underlying tiles generate one as overview.
-
-        tcount = 0
-        for tz in range(self.max_zoom - 1, self.min_zoom - 1, -1):
-            tminx, tminy, tmaxx, tmaxy = self.tminmax[tz]
-            tcount += (1 + abs(tmaxx - tminx)) * (1 + abs(tmaxy - tminy))
-
         # querysize = tile_size * 2
         for tz in range(self.max_zoom - 1, self.min_zoom - 1, -1):
             tminx, tminy, tmaxx, tmaxy = self.tminmax[tz]

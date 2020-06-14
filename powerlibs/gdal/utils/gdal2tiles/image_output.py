@@ -55,15 +55,9 @@ class BaseImageOutput:
             logger.debug("NO ALPHA CHANNEL")
             self.data_bands_count = self.out_ds.RasterCount
 
-    def create_base_tile(
-        self, tx, ty, tz, xyzzy, alpha, precheck_existence=True
-    ):
+    def create_base_tile(self, tx, ty, tz, xyzzy, alpha):
         """Create image of a base level tile and write it to disk."""
-
         path = self.get_full_path(tx, ty, tz, 'png')
-        if precheck_existence and path.exists():
-            logger.info(f'create_base_tile: {path} already exists. Skipping.')
-            return
 
         num_bands = self.data_bands_count
         if alpha is not None:
@@ -108,6 +102,7 @@ class BaseImageOutput:
                     alpha, band_list=[num_bands]
                 )
 
+            logger.info(f'saving base tile: {path}')
             gdal_write(path, dstile, 'PNG')
 
             # Note: For source drivers based on WaveLet compression (JPEG2000, ECW, MrSID)
@@ -134,6 +129,7 @@ class BaseImageOutput:
                     xyzzy.wxsize, xyzzy.wysize,
                     alpha, band_list=[num_bands]
                 )
+            logger.info(f'saving resampled base tile: {path}')
             self.resampler(path, dsquery, dstile, 'PNG')
 
     def write_overview_tile(self, tx, ty, tz, precheck_existence=True):
@@ -150,7 +146,8 @@ class BaseImageOutput:
             '', 2 * self.tile_size, 2 * self.tile_size, num_bands
         )
 
-        dsquery.GetRasterBand(num_bands).Fill(self.nodata)
+        # Fill alpha band with zeroes (why? IDK)
+        dsquery.GetRasterBand(num_bands).Fill(0)
 
         for cx, cy, child_image_format in self.iter_children(tx, ty, tz):
             tileposy = self.get_tileposy(ty, cy)
@@ -161,25 +158,30 @@ class BaseImageOutput:
             else:
                 tileposx = 0
 
-            path = self.get_full_path(
+            origin_path = self.get_full_path(
                 cx, cy, tz + 1, 'png'
             )
-            dsquerytile = gdal.Open(str(path), gdal.GA_ReadOnly)
+            dsquerytile = gdal.Open(str(origin_path), gdal.GA_ReadOnly)
+            dsdata = dsquerytile.ReadRaster(
+                0, 0, self.tile_size, self.tile_size
+            )
 
             dsquery.WriteRaster(
                 tileposx, tileposy, self.tile_size, self.tile_size,
-                dsquerytile.ReadRaster(0, 0, self.tile_size, self.tile_size),
+                dsdata,
                 band_list=list(range(1, dsquerytile.RasterCount + 1))
             )
 
-            dsquery.WriteRaster(
-                tileposx, tileposy, self.tile_size, self.tile_size,
-                self.alpha_filler, band_list=[num_bands]
-            )
+            if dsquerytile.RasterCount != num_bands:
+                dsquery.WriteRaster(
+                    tileposx, tileposy, self.tile_size, self.tile_size,
+                    self.alpha_filler, band_list=[num_bands]
+                )
 
         dstile = self.mem_drv.Create(
             '', self.tile_size, self.tile_size, num_bands
         )
+        logger.info(f'saving overview tile: {path}')
         self.resampler(path, dsquery, dstile, 'PNG')
 
     def get_tileposy(self, ty, cy):
@@ -220,5 +222,12 @@ class SimpleImageOutput(BaseImageOutput):
     """Image output using only one image format."""
 
     def write_base_tile(self, tx, ty, tz, xyzzy, precheck_existence=True):
+        if precheck_existence:
+            path = self.get_full_path(tx, ty, tz, 'png')
+            if path.exists():
+                logger.info(
+                    f'write_base_tile: {path} already exists. Skipping.'
+                )
+                return
         alpha = self.read_alpha(xyzzy)
-        self.create_base_tile(tx, ty, tz, xyzzy, alpha, precheck_existence)
+        self.create_base_tile(tx, ty, tz, xyzzy, alpha)
