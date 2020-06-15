@@ -2,7 +2,8 @@ import math
 
 from .gdal2tiles import GDAL2Tiles
 from .image_output import SimpleImageOutput
-from .resampler import Resampler
+from .resampler import get_resampler
+from .utils import gdal_write
 from .xyzzy import Xyzzy
 
 
@@ -94,11 +95,12 @@ class Leaflet(Raster):
         return range(tminy, tmaxy + 1)
 
     def instantiate_image_output(self):
-        resampler = Resampler(self.resampling_method)
+        resampler = get_resampler(self.resampling_method, gdal_write)
         self.image_output = LeafletImageOutput(
             self.out_ds,
             self.tile_size,
             resampler,
+            gdal_write,
             self.source_nodata,
             self.output_dir
         )

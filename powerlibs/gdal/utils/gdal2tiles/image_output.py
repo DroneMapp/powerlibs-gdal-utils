@@ -4,7 +4,7 @@ import os
 
 from osgeo import gdal
 
-from .utils import get_gdal_driver, gdal_write
+from .utils import get_gdal_driver
 
 
 logger = logging.getLogger(__name__)
@@ -19,12 +19,13 @@ class BaseImageOutput:
     """Base class for image output."""
 
     def __init__(
-        self, out_ds, tile_size, resampler, nodata,
-        output_dir
+        self, out_ds, tile_size, resampler, write_method,
+        nodata, output_dir
     ):
         self.out_ds = out_ds
         self.tile_size = tile_size
         self.resampler = resampler
+        self.write_method = write_method
         self.nodata = nodata
         self.output_dir = PosixPath(output_dir)
 
@@ -103,7 +104,7 @@ class BaseImageOutput:
                 )
 
             logger.info(f'saving base tile: {path}')
-            gdal_write(path, dstile, 'PNG')
+            self.write_method(path, dstile, 'PNG')
 
             # Note: For source drivers based on WaveLet compression (JPEG2000, ECW, MrSID)
             # the ReadRaster function returns high-quality raster (not ugly nearest neighbour)
@@ -130,7 +131,7 @@ class BaseImageOutput:
                     alpha, band_list=[num_bands]
                 )
             logger.info(f'saving resampled base tile: {path}')
-            self.resampler(path, dsquery, dstile, 'PNG')
+            self.resampler(path, dsquery, dstile)
 
     def write_overview_tile(self, tx, ty, tz, precheck_existence=True):
         """Create image of a overview level tile and write it to disk."""
@@ -149,7 +150,7 @@ class BaseImageOutput:
         # Fill alpha band with zeroes (why? IDK)
         dsquery.GetRasterBand(num_bands).Fill(0)
 
-        for cx, cy, child_image_format in self.iter_children(tx, ty, tz):
+        for cx, cy in self.iter_children(tx, ty, tz):
             tileposy = self.get_tileposy(ty, cy)
             if tx:
                 tileposx = cx % (2 * tx) * self.tile_size
@@ -182,7 +183,7 @@ class BaseImageOutput:
             '', self.tile_size, self.tile_size, num_bands
         )
         logger.info(f'saving overview tile: {path}')
-        self.resampler(path, dsquery, dstile, 'PNG')
+        self.resampler(path, dsquery, dstile)
 
     def get_tileposy(self, ty, cy):
         if (ty == 0 and cy == 1) or (ty != 0 and (cy % (2 * ty)) != 0):
@@ -196,7 +197,7 @@ class BaseImageOutput:
         for y in range(2 * ty, 2 * ty + 2):
             for x in range(2 * tx, 2 * tx + 2):
                 if self.tile_exists(x, y, tz + 1):
-                    yield x, y, 'PNG'
+                    yield x, y
 
     def read_alpha(self, xyzzy):
         if self.alpha_band is None:

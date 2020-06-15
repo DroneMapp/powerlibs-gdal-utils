@@ -4,13 +4,13 @@ from .defines import MAXZOOMLEVEL
 
 
 class GlobalGeodetic:
-    def __init__(self, tileSize=256):
-        self.tileSize = tileSize
+    def __init__(self, tile_size=256):
+        self.tile_size = tile_size
 
     def LatLonToPixels(self, lat, lon, zoom):
         "Converts lat/lon to pixel coordinates in given zoom of the EPSG:4326 pyramid"
 
-        res = 180.0 / self.tileSize / 2**zoom
+        res = 180.0 / self.tile_size / 2**zoom
         px = (180 + lat) / res
         py = (90 + lon) / res
         return px, py
@@ -18,8 +18,8 @@ class GlobalGeodetic:
     def PixelsToTile(self, px, py):
         "Returns coordinates of the tile covering region in pixel coordinates"
 
-        tx = int(math.ceil(px / float(self.tileSize)) - 1)
-        ty = int(math.ceil(py / float(self.tileSize)) - 1)
+        tx = int(math.ceil(px / float(self.tile_size)) - 1)
+        ty = int(math.ceil(py / float(self.tile_size)) - 1)
         return tx, ty
 
     def LatLonToTile(self, lat, lon, zoom):
@@ -31,7 +31,7 @@ class GlobalGeodetic:
     def Resolution(self, zoom):
         "Resolution (arc/pixel) for given zoom level (measured at Equator)"
 
-        return 180.0 / self.tileSize / 2**zoom
+        return 180.0 / self.tile_size / 2**zoom
 
     def ZoomForPixelSize(self, pixelSize):
         "Maximal scaledown zoom of the pyramid closest to the pixelSize."
@@ -45,12 +45,12 @@ class GlobalGeodetic:
 
     def TileBounds(self, tx, ty, zoom):
         "Returns bounds of the given tile"
-        res = 180.0 / self.tileSize / 2**zoom
+        res = 180.0 / self.tile_size / 2**zoom
         return (
-            tx * self.tileSize * res - 180,
-            ty * self.tileSize * res - 90,
-            (tx + 1) * self.tileSize * res - 180,
-            (ty + 1) * self.tileSize * res - 90
+            tx * self.tile_size * res - 180,
+            ty * self.tile_size * res - 90,
+            (tx + 1) * self.tile_size * res - 180,
+            (ty + 1) * self.tile_size * res - 90
         )
 
     def TileLatLonBounds(self, tx, ty, zoom):

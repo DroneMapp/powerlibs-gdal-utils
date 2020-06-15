@@ -14,7 +14,7 @@ def get_gdal_driver(name):
         return driver
 
 
-def gdal_write(path, dstile, image_format):
+def gdal_write(path, dstile):
     PNG_DRIVER.CreateCopy(str(path), dstile, strict=0)
 
 

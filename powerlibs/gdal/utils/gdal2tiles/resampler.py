@@ -3,14 +3,14 @@ from osgeo import gdal
 import osgeo.gdal_array as gdalarray
 from PIL import Image
 
-from .utils import gdal_write, ensure_dir_exists
+from .utils import ensure_dir_exists
 from .exceptions import ImageOutputException
 
 
-def Resampler(name):
+def get_resampler(name, write_method):
     """Return a function performing given resampling algorithm."""
 
-    def resample_average(path, dsquery, dstile, image_format):
+    def resample_average(path, dsquery, dstile):
         for i in range(1, dstile.RasterCount + 1):
             res = gdal.RegenerateOverview(
                 dsquery.GetRasterBand(i), dstile.GetRasterBand(i), "average"
@@ -20,9 +20,9 @@ def Resampler(name):
                     "RegenerateOverview() failed with error %d" % res
                 )
 
-        gdal_write(path, dstile, image_format)
+        write_method(path, dstile)
 
-    def resample_antialias(path, dsquery, dstile, image_format):
+    def resample_antialias(path, dsquery, dstile):
         querysize = dsquery.RasterXSize
         tile_size = dstile.RasterXSize
 
@@ -39,7 +39,7 @@ def Resampler(name):
             im1 = Image.composite(im1, im0, im1)
 
         ensure_dir_exists(path.parent)
-        im1.save(str(path), image_format)
+        im1.save(str(path), 'PNG')
 
     if name == "average":
         return resample_average
@@ -56,7 +56,7 @@ def Resampler(name):
 
     resampling_method = resampling_methods[name]
 
-    def resample_gdal(path, dsquery, dstile, image_format):
+    def resample_gdal(path, dsquery, dstile):
         querysize = dsquery.RasterXSize
         tile_size = dstile.RasterXSize
 
@@ -67,6 +67,6 @@ def Resampler(name):
         if res != 0:
             raise ImageOutputException("ReprojectImage() failed with error %d" % res)
 
-        gdal_write(path, dstile, image_format)
+        write_method(path, dstile)
 
     return resample_gdal

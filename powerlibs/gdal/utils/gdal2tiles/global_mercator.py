@@ -4,9 +4,9 @@ from .defines import MAXZOOMLEVEL
 
 
 class GlobalMercator:
-    def __init__(self, tileSize=256):
-        self.tileSize = tileSize
-        self.initialResolution = 2 * math.pi * 6378137 / self.tileSize
+    def __init__(self, tile_size=256):
+        self.tile_size = tile_size
+        self.initialResolution = 2 * math.pi * 6378137 / self.tile_size
         self.originShift = 2 * math.pi * 6378137 / 2.0
 
     # Oh, man, those shitty names with CamelCase...
@@ -48,13 +48,13 @@ class GlobalMercator:
     def PixelsToTile(self, px, py):
         "Returns a tile covering region in given pixel coordinates"
 
-        tx = int(math.ceil(px / float(self.tileSize)) - 1)
-        ty = int(math.ceil(py / float(self.tileSize)) - 1)
+        tx = int(math.ceil(px / float(self.tile_size)) - 1)
+        ty = int(math.ceil(py / float(self.tile_size)) - 1)
         return tx, ty
 
     def PixelsToRaster(self, px, py, zoom):
         "Move the origin of pixel coordinates to top-left corner"
-        mapSize = self.tileSize << zoom
+        mapSize = self.tile_size << zoom
         return px, mapSize - py
 
     def MetersToTile(self, mx, my, zoom):
@@ -67,10 +67,10 @@ class GlobalMercator:
         "Returns bounds of the given tile in EPSG:3857 coordinates"
 
         minx, miny = self.PixelsToMeters(
-            tx * self.tileSize, ty * self.tileSize, zoom
+            tx * self.tile_size, ty * self.tile_size, zoom
         )
         maxx, maxy = self.PixelsToMeters(
-            (tx + 1) * self.tileSize, (ty + 1) * self.tileSize, zoom
+            (tx + 1) * self.tile_size, (ty + 1) * self.tile_size, zoom
         )
         return (minx, miny, maxx, maxy)
 
@@ -88,7 +88,7 @@ class GlobalMercator:
         """Resolution (meters/pixel) for given
         zoom level (measured at Equator)"""
 
-        # return (2 * math.pi * 6378137) / (self.tileSize * 2**zoom)
+        # return (2 * math.pi * 6378137) / (self.tile_size * 2**zoom)
         return self.initialResolution / (2**zoom)
 
     def ZoomForPixelSize(self, pixelSize):

@@ -10,6 +10,10 @@ from .xyzzy import Xyzzy
 
 
 class CommonProfile(GDAL2Tiles):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.projection = self.projection_class(tile_size=self.tile_size)
+
     def reproject_if_necessary(self):
         in_ds = self.in_ds
 
@@ -196,7 +200,7 @@ class CommonProfile(GDAL2Tiles):
 
 
 class Mercator(CommonProfile):
-    projection = GlobalMercator()
+    projection_class = GlobalMercator
 
     def set_out_srs(self):
         self.out_srs.ImportFromEPSG(3857)
@@ -220,7 +224,7 @@ class Mercator(CommonProfile):
 
 
 class Geodetic(CommonProfile):
-    projection = GlobalGeodetic()
+    projection_class = GlobalGeodetic
 
     def set_out_srs(self):
         self.out_srs.ImportFromEPSG(4326)

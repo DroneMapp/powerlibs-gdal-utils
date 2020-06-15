@@ -5,8 +5,8 @@ from osgeo import gdal
 from osgeo import osr
 
 from .image_output import SimpleImageOutput
-from .resampler import Resampler
-from .utils import ensure_dir_exists
+from .resampler import get_resampler
+from .utils import ensure_dir_exists, gdal_write
 
 
 class GDAL2Tiles:
@@ -15,7 +15,8 @@ class GDAL2Tiles:
             source_path, output_dir,
             min_zoom=None, max_zoom=None,
             resampling_method='average',
-            source_srs=None, source_nodata=None
+            source_srs=None, source_nodata=None,
+            tile_size=256
     ):
         self.source_path = PosixPath(source_path)
         self.output_dir = PosixPath(output_dir)
@@ -27,7 +28,7 @@ class GDAL2Tiles:
         self.source_nodata = source_nodata
 
         # Tile format
-        self.tile_size = 256
+        self.tile_size = tile_size
 
         # Should we read bigger window of the input raster and scale it down?
         # Note: Modified later by open_input()
@@ -35,6 +36,8 @@ class GDAL2Tiles:
         # Not for Wavelet based drivers (JPEG2000, ECW, MrSID)
         # Not for 'raster' profile
         self.scaledquery = True
+
+        self.write_method = gdal_write
 
         # Should we use Read on the input file for generating overview tiles?
         # Note: Modified later by open_input()
@@ -167,11 +170,12 @@ gdal2tiles temp.vrt""" % self.source_path)
 
     def instantiate_image_output(self):
         # Instantiate image output.
-        resampler = Resampler(self.resampling_method)
+        resampler = get_resampler(self.resampling_method, self.write_method)
         self.image_output = SimpleImageOutput(
             self.out_ds,
             self.tile_size,
             resampler,
+            self.write_method,
             self.source_nodata,
             self.output_dir,
         )
